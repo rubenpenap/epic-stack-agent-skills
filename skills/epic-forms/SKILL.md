@@ -23,6 +23,76 @@ Use this skill when you need to:
 
 ## Patterns and conventions
 
+### Validation Philosophy
+
+Following Epic Web principles:
+
+**Explicit is better than implicit** - Make validation rules clear and explicit using Zod schemas. Every validation rule should be visible in the schema, not hidden in business logic. Error messages should be specific and helpful, telling users exactly what went wrong and how to fix it.
+
+**Design to fail fast and early** - Validate input as early as possible, ideally on the client side before submission, and always on the server side. Return clear, specific error messages immediately so users can fix issues without frustration.
+
+**Example - Explicit validation:**
+```typescript
+// ✅ Good - Explicit validation with clear error messages
+const SignupSchema = z.object({
+	email: z
+		.string({ required_error: 'Email is required' })
+		.email({ message: 'Please enter a valid email address' })
+		.min(3, { message: 'Email must be at least 3 characters' })
+		.max(100, { message: 'Email must be less than 100 characters' })
+		.transform((val) => val.toLowerCase().trim()),
+	password: z
+		.string({ required_error: 'Password is required' })
+		.min(6, { message: 'Password must be at least 6 characters' })
+		.max(72, { message: 'Password must be less than 72 characters' }),
+})
+
+// ❌ Avoid - Implicit validation
+const SignupSchema = z.object({
+	email: z.string().email(), // No clear error messages
+	password: z.string().min(6), // Generic error
+})
+```
+
+**Example - Fail fast validation:**
+```typescript
+// ✅ Good - Validate early and return specific errors immediately
+export async function action({ request }: Route.ActionArgs) {
+	const formData = await request.formData()
+
+	// Validate immediately - fail fast
+	const submission = await parseWithZod(formData, {
+		schema: SignupSchema,
+	})
+
+	// Return errors immediately if validation fails
+	if (submission.status !== 'success') {
+		return data(
+			{ result: submission.reply() },
+			{ status: 400 }, // Clear error status
+		)
+	}
+
+	// Only proceed if validation passed
+	const { email, password } = submission.value
+	// ... continue with signup
+}
+
+// ❌ Avoid - Delayed or unclear validation
+export async function action({ request }: Route.ActionArgs) {
+	const formData = await request.formData()
+	const email = formData.get('email')
+	const password = formData.get('password')
+
+	// Validation scattered throughout the function
+	if (!email) {
+		// Generic error, not specific
+		return json({ error: 'Invalid' }, { status: 400 })
+	}
+	// ... more scattered validation
+}
+```
+
 ### Basic setup with Conform
 
 Epic Stack uses [Conform](https://conform.guide/) to handle forms with progressive enhancement.
@@ -81,25 +151,27 @@ const SignupSchema = z.object({
 })
 ```
 
-**Validation in action:**
+**Validation in action (fail fast):**
 ```typescript
 export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
-	
+
+	// Validate immediately - explicit and fail fast
 	const submission = await parseWithZod(formData, {
 		schema: SignupSchema,
 	})
-	
+
+	// Return explicit errors immediately if validation fails
 	if (submission.status !== 'success') {
 		return data(
 			{ result: submission.reply() },
 			{ status: submission.status === 'error' ? 400 : 200 },
 		)
 	}
-	
-	// submission.value contains the validated data
+
+	// Only proceed if validation passed - submission.value is type-safe
 	const { email, password } = submission.value
-	// ... process
+	// ... process with validated data
 }
 ```
 
@@ -110,7 +182,7 @@ For validations that require querying the database:
 ```typescript
 export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
-	
+
 	const submission = await parseWithZod(formData, {
 		schema: SignupSchema.superRefine(async (data, ctx) => {
 			const existingUser = await prisma.user.findUnique({
@@ -127,14 +199,14 @@ export async function action({ request }: Route.ActionArgs) {
 		}),
 		async: true, // Important: enable async validation
 	})
-	
+
 	if (submission.status !== 'success') {
 		return data(
 			{ result: submission.reply() },
 			{ status: submission.status === 'error' ? 400 : 200 },
 		)
 	}
-	
+
 	// ...
 }
 ```
@@ -253,9 +325,9 @@ import { checkHoneypot } from '#app/utils/honeypot.server.ts'
 
 export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
-	
+
 	await checkHoneypot(formData) // Throws error if spam
-	
+
 	// ... rest of code
 }
 ```
@@ -301,24 +373,24 @@ const NoteEditorSchema = z.object({
 ```typescript
 export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
-	
+
 	const submission = await parseWithZod(formData, {
 		schema: NoteEditorSchema,
 	})
-	
+
 	if (submission.status !== 'success') {
 		return data({ result: submission.reply() }, { status: 400 })
 	}
-	
+
 	const { images } = submission.value
-	
+
 	// Process files
 	for (const image of images ?? []) {
 		if (image.file) {
 			// Upload file, save to storage, etc.
 		}
 	}
-	
+
 	// ...
 }
 ```
@@ -370,7 +442,7 @@ return (
 					</fieldset>
 				)
 			})}
-			
+
 			<button
 				type="button"
 				onClick={() => fields.images.append()}
@@ -478,7 +550,7 @@ const LoginSchema = z.object({
 
 export default function LoginRoute({ actionData }: Route.ComponentProps) {
 	const isPending = useIsPending()
-	
+
 	const [form, fields] = useForm({
 		id: 'login-form',
 		constraint: getZodConstraint(LoginSchema),
@@ -605,7 +677,7 @@ export default function NewNoteRoute({ actionData }: Route.ComponentProps) {
 					}}
 					errors={fields.content.errors}
 				/>
-				
+
 				{imageList.map((image, index) => {
 					const imageFieldset = getFieldsetProps(fields.images[index])
 					return (
@@ -621,7 +693,7 @@ export default function NewNoteRoute({ actionData }: Route.ComponentProps) {
 						</fieldset>
 					)
 				})}
-				
+
 				<button
 					type="button"
 					onClick={() => fields.images.append()}
@@ -629,7 +701,7 @@ export default function NewNoteRoute({ actionData }: Route.ComponentProps) {
 				>
 					Add Image
 				</button>
-				
+
 				<ErrorList errors={form.errors} id={form.errorId} />
 				<StatusButton type="submit">Create Note</StatusButton>
 			</Form>
@@ -640,6 +712,9 @@ export default function NewNoteRoute({ actionData }: Route.ComponentProps) {
 
 ## Common mistakes to avoid
 
+- ❌ **Implicit validation**: Always use explicit Zod schemas with clear error messages, not hidden validation logic
+- ❌ **Delayed validation**: Validate input immediately and fail fast - don't wait until the end of the function
+- ❌ **Generic error messages**: Use specific, helpful error messages that tell users exactly what's wrong
 - ❌ **Forgetting `async: true` in async validation**: Always include `async: true` when using `superRefine` with async
 - ❌ **Not including `HoneypotInputs` in public forms**: Always include honeypot in forms accessible without authentication
 - ❌ **Forgetting `encType="multipart/form-data"`**: Required for file uploads
@@ -653,6 +728,7 @@ export default function NewNoteRoute({ actionData }: Route.ComponentProps) {
 
 - [Conform Documentation](https://conform.guide/)
 - [Zod Documentation](https://zod.dev/)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - `app/components/forms.tsx` - Field components
 - `app/routes/_auth/signup.tsx` - Complete signup example
 - `app/routes/_auth/onboarding/index.tsx` - Complex form example

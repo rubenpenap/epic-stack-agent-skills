@@ -1,25 +1,33 @@
 ---
 name: epic-react-best-practices
-description: Guide on React best practices, performance optimization, and code quality for Epic Stack
+description: Guide on React patterns, performance optimization, and code quality for Epic Stack
 categories:
   - react
   - performance
-  - best-practices
+  - patterns
   - optimization
 ---
 
-# Epic Stack: React Best Practices
+# Epic Stack: React Patterns and Guidelines
 
 ## When to use this skill
 
 Use this skill when you need to:
 - Write efficient React components in Epic Stack applications
 - Optimize performance and bundle size
-- Follow React Router best practices
+- Follow React Router patterns and conventions
 - Avoid common React anti-patterns
 - Implement proper code splitting
 - Optimize re-renders and data fetching
 - Use React hooks correctly
+
+## Philosophy
+
+Following Epic Web principles:
+- **Make it work, make it right, make it fast** - In that order. First make it functional, then refactor for clarity, then optimize for performance.
+- **Pragmatism over purity** - Choose practical solutions that work well in your context rather than theoretically perfect ones.
+- **Optimize for sustainable velocity** - Write code that's easy to maintain and extend, not just fast to write initially.
+- **Do as little as possible** - Only add complexity when it provides real value.
 
 ## Patterns and conventions
 
@@ -296,7 +304,7 @@ export function ErrorBoundary() {
 }
 ```
 
-### TypeScript Best Practices
+### TypeScript Guidelines
 
 **✅ Good - Type props explicitly:**
 ```typescript
@@ -630,5 +638,6 @@ function SearchInput() {
 - [React Documentation - You Might Not Need useEffect](https://react.dev/learn/you-might-not-need-an-effect)
 - [Conform Documentation](https://conform.guide/)
 - [Epic Stack Docs](https://www.epicweb.dev/docs)
-- `app/routes/` - Example routes using best practices
+- [Epic Web Principles](https://www.epicweb.dev/principles)
+- `app/routes/` - Example routes using these patterns
 - `.cursor/rules/avoid-use-effect.mdc` - Epic Stack rule for avoiding useEffect

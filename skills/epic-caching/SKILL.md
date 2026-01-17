@@ -21,6 +21,56 @@ Use this skill when you need to:
 
 ## Patterns and conventions
 
+### Caching Philosophy
+
+Following Epic Web principles:
+
+**Weigh the cost-benefit of performance optimizations** - Caching adds complexity. Only add cache when there's a clear, measurable benefit. Don't cache "just in case" - cache when you have a real performance problem that caching solves.
+
+**When NOT to use cache:**
+- Data that changes frequently (cache invalidation becomes a problem)
+- Data that's already fast to fetch (no measurable benefit)
+- Data that's only fetched once (no benefit from caching)
+- Simple queries that don't need optimization
+- When cache invalidation logic becomes more complex than the problem it solves
+
+**Example - Evaluating cost-benefit:**
+```typescript
+// ✅ Good - Cache expensive external API call
+export async function getGitHubEvents({ username, timings }: { username: string; timings?: Timings }) {
+	return await cachified({
+		key: `github:${username}:events`,
+		cache,
+		timings,
+		getFreshValue: async () => {
+			// Expensive: External API call, rate limits, network latency
+			const response = await fetch(`https://api.github.com/users/${username}/events/public`)
+			return await response.json()
+		},
+		checkValue: GitHubEventSchema.array(),
+		ttl: 1000 * 60 * 60, // 1 hour - reasonable for external data
+	})
+}
+
+// ❌ Avoid - Caching simple, fast database query
+export async function getUser({ userId }: { userId: string }) {
+	// This query is already fast - caching adds complexity without benefit
+	return await cachified({
+		key: `user:${userId}`,
+		cache,
+		getFreshValue: async () => {
+			// Simple query, already fast
+			return await prisma.user.findUnique({
+				where: { id: userId },
+				select: { id: true, username: true },
+			})
+		},
+		ttl: 1000 * 60 * 5,
+	})
+	// Better: Just query directly without cache
+}
+```
+
 ### Two Types of Cache
 
 Epic Stack provides two types of cache:
@@ -481,6 +531,9 @@ export async function fetchWithDedup(url: string) {
 
 ## Common mistakes to avoid
 
+- ❌ **Caching without measuring benefit**: Only add cache when there's a clear, measurable performance problem
+- ❌ **Caching simple, fast queries**: Don't cache data that's already fast to fetch - it adds complexity without benefit
+- ❌ **Caching frequently changing data**: Cache invalidation becomes more complex than the problem it solves
 - ❌ **Caching sensitive data**: Never cache passwords, tokens, or sensitive personal data
 - ❌ **TTL too long**: Avoid very long TTLs (> 1 week) unless absolutely necessary
 - ❌ **Not validating cached data**: Always use `checkValue` with Zod to validate data
@@ -488,12 +541,13 @@ export async function fetchWithDedup(url: string) {
 - ❌ **Assuming cache always works**: Cache can fail, always handle errors
 - ❌ **Keys too long or ambiguous**: Use consistent and descriptive format
 - ❌ **Not using timings**: Integrate with server timing for monitoring
-- ❌ **Caching frequently changing data**: Doesn't make sense to cache data that changes every second
-- ❌ **Forgetting stale-while-revalidate**: Use SWR for better UX
+- ❌ **Forgetting stale-while-revalidate**: Use SWR for better UX when appropriate
+- ❌ **Over-caching**: Too much caching makes the system harder to understand and debug
 
 ## References
 
 - [Epic Stack Caching Docs](../epic-stack/docs/caching.md)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - [@epic-web/cachified](https://www.npmjs.com/package/@epic-web/cachified)
 - `app/utils/cache.server.ts` - Cache implementation
 - `app/routes/admin/cache/` - Admin dashboard

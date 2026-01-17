@@ -20,6 +20,51 @@ Use this skill when you need to:
 
 ## Patterns and conventions
 
+### Permissions Philosophy
+
+Following Epic Web principles:
+
+**Explicit is better than implicit** - Always explicitly check permissions. Don't assume a user has access based on implicit rules or hidden logic. Every permission check should be visible and clear in the code.
+
+**Example - Explicit permission checks:**
+```typescript
+// ✅ Good - Explicit permission check
+export async function action({ request }: Route.ActionArgs) {
+	const userId = await requireUserId(request)
+	
+	// Explicitly check permission - clear and visible
+	await requireUserWithPermission(request, 'delete:note:own')
+	
+	// Permission check is explicit and obvious
+	await prisma.note.delete({ where: { id: noteId } })
+}
+
+// ❌ Avoid - Implicit permission check
+export async function action({ request }: Route.ActionArgs) {
+	const userId = await requireUserId(request)
+	const note = await prisma.note.findUnique({ where: { id: noteId } })
+	
+	// Implicit check - not clear what permission is being checked
+	if (note.ownerId !== userId) {
+		throw new Response('Forbidden', { status: 403 })
+	}
+	// What permission does this represent? Not explicit
+}
+```
+
+**Example - Explicit permission strings:**
+```typescript
+// ✅ Good - Explicit permission string
+const permission: PermissionString = 'delete:note:own'
+// Clear: action (delete), entity (note), access (own)
+
+await requireUserWithPermission(request, permission)
+
+// ❌ Avoid - Implicit or unclear permissions
+const canDelete = checkUserCanDelete(user, note)
+// What permission is this checking? Not explicit
+```
+
 ### RBAC Model
 
 Epic Stack uses an RBAC (Role-Based Access Control) model where:
@@ -101,10 +146,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 ```
 
-**Conditional permissions (own vs any):**
+**Conditional permissions (own vs any) - explicit:**
 ```typescript
 export async function action({ request }: Route.ActionArgs) {
 	const userId = await requireUserId(request)
+	
+	// Explicitly determine ownership
 	const note = await prisma.note.findUnique({
 		where: { id: noteId },
 		select: { ownerId: true },
@@ -112,11 +159,13 @@ export async function action({ request }: Route.ActionArgs) {
 	
 	const isOwner = note.ownerId === userId
 	
+	// Explicitly check the appropriate permission based on ownership
 	await requireUserWithPermission(
 		request,
-		isOwner ? 'delete:note:own' : 'delete:note:any',
+		isOwner ? 'delete:note:own' : 'delete:note:any', // Explicit permission string
 	)
 	
+	// Permission check is explicit and clear
 	// Proceed with deletion...
 }
 ```
@@ -467,17 +516,20 @@ async function setupPostPermissions() {
 
 ## Common mistakes to avoid
 
+- ❌ **Implicit permission checks**: Always explicitly check permissions - make permission requirements visible in code
 - ❌ **Not validating permissions on server-side**: Always validate permissions in action/loader, never trust client-side only
-- ❌ **Forgetting to verify `own` vs `any`**: Determine if user is owner before validating permission
-- ❌ **Not using correct helpers**: Use `requireUserWithPermission` for server-side and `userHasPermission` for client-side
-- ❌ **Not creating unique permissions**: Use `@@unique([action, entity, access])` in schema
+- ❌ **Forgetting to verify `own` vs `any`**: Explicitly determine if user is owner before validating permission
+- ❌ **Not using correct helpers**: Use `requireUserWithPermission` for server-side and `userHasPermission` for client-side - explicit helpers
+- ❌ **Not creating unique permissions**: Use `@@unique([action, entity, access])` in schema - explicit permission structure
 - ❌ **Assuming permissions instead of verifying**: Always verify explicitly, even if you think user has the permission
 - ❌ **Not handling 403 errors**: Helpers throw errors that must be handled by ErrorBoundary
-- ❌ **Not using types**: Use `PermissionString` type for type-safety
+- ❌ **Not using types**: Use `PermissionString` type for type-safety - explicit types
+- ❌ **Hidden permission logic**: Don't hide permission checks in utility functions - make them explicit at the call site
 
 ## References
 
 - [Epic Stack Permissions Docs](../epic-stack/docs/permissions.md)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - [RBAC Explained](https://auth0.com/intro-to-iam/what-is-role-based-access-control-rbac)
 - `app/utils/permissions.server.ts` - Server-side permission utilities
 - `app/utils/user.ts` - Client-side permission utilities

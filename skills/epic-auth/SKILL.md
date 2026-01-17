@@ -24,6 +24,71 @@ Use this skill when you need to:
 
 ## Patterns and conventions
 
+### Authentication Philosophy
+
+Following Epic Web principles:
+
+**Least privilege** - Users should only have access to what they need, when they need it. Sessions should have minimal permissions and expire appropriately. Don't grant more access than necessary.
+
+**Design to fail fast and early** - Validate authentication and authorization as early as possible. Check session validity immediately, verify permissions before processing requests, and return clear errors quickly.
+
+**Example - Least privilege in sessions:**
+```typescript
+// ✅ Good - Minimal session data, explicit permissions
+const session = await prisma.session.create({
+	data: {
+		expirationDate: getSessionExpirationDate(),
+		userId, // Only store user ID, not full user data
+	},
+})
+
+// Session only grants access to this specific user
+// Permissions checked separately when needed
+
+// ❌ Avoid - Storing too much in session
+const session = await prisma.session.create({
+	data: {
+		expirationDate: getSessionExpirationDate(),
+		userId,
+		userRole: 'admin', // Don't store roles in session
+		permissions: ['all'], // Don't store permissions in session
+	},
+})
+// Roles and permissions should be checked from database, not session
+```
+
+**Example - Fail fast authentication:**
+```typescript
+// ✅ Good - Validate authentication early
+export async function loader({ request }: Route.LoaderArgs) {
+	// Check authentication immediately - fail fast
+	const userId = await requireUserId(request)
+	
+	// Check permissions early - fail fast
+	await requireUserWithPermission(request, 'read:note:own')
+	
+	// Only proceed if authenticated and authorized
+	const notes = await prisma.note.findMany({
+		where: { ownerId: userId },
+	})
+	
+	return { notes }
+}
+
+// ❌ Avoid - Delayed authentication check
+export async function loader({ request }: Route.LoaderArgs) {
+	// Process request first...
+	const notes = await prisma.note.findMany()
+	
+	// Check authentication at the end - too late!
+	const userId = await getUserId(request)
+	if (!userId) {
+		// Already processed request
+		throw redirect('/login')
+	}
+}
+```
+
 ### Cookie-based Sessions
 
 Epic Stack uses cookie-based sessions for authentication. Sessions are stored in the database and identified by signed cookies.
@@ -86,13 +151,15 @@ const LoginSchema = z.object({
 })
 ```
 
-**Login action:**
+**Login action (fail fast):**
 ```typescript
 import { login } from '#app/utils/auth.server.ts'
 import { handleNewSession } from './login.server.ts'
 
 export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
+	
+	// Validate input early - fail fast
 	const submission = await parseWithZod(formData, {
 		schema: LoginSchema,
 	})
@@ -103,9 +170,11 @@ export async function action({ request }: Route.ActionArgs) {
 
 	const { username, password, redirectTo, remember } = submission.value
 
+	// Authenticate early - fail fast if invalid
 	const session = await login({ username, password })
 
 	if (!session) {
+		// Return error immediately - don't process further
 		return data(
 			{
 				result: submission.reply({
@@ -116,6 +185,7 @@ export async function action({ request }: Route.ActionArgs) {
 		)
 	}
 
+	// Only create session if authentication succeeded
 	return handleNewSession({
 		request,
 		session,
@@ -667,18 +737,22 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 ## Common mistakes to avoid
 
+- ❌ **Delayed authentication checks**: Validate authentication and authorization as early as possible - fail fast
+- ❌ **Granting excessive privileges**: Follow least privilege - only grant access to what's needed, when it's needed
+- ❌ **Storing too much in sessions**: Store minimal data in sessions (just user ID), check permissions from database
 - ❌ **Not verifying session on each request**: Always use `getUserId` or `requireUserId` in protected loaders/actions
 - ❌ **Not handling 2FA correctly**: Verify if user has 2FA before creating session
-- ❌ **Not destroying expired sessions**: Sessions must be verified against `expirationDate`
+- ❌ **Not destroying expired sessions**: Sessions must be verified against `expirationDate` - check early
 - ❌ **Not using `handleNewSession`**: This helper correctly handles 2FA and cookie creation
 - ❌ **Forgetting to handle `remember`**: Make sure to respect user preference
-- ❌ **Not validating OAuth callbacks**: Always validate that provider exists and result is successful
+- ❌ **Not validating OAuth callbacks**: Always validate that provider exists and result is successful - fail fast
 - ❌ **Not linking OAuth accounts**: If email exists, link the account instead of creating duplicate
 - ❌ **Not updating counter in passkeys**: Always update counter after successful verification
 
 ## References
 
 - [Epic Stack Authentication Docs](../epic-stack/docs/authentication.md)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - [Remix Auth](https://github.com/sergiodxa/remix-auth)
 - [SimpleWebAuthn](https://simplewebauthn.dev/)
 - `app/utils/auth.server.ts` - Authentication utilities

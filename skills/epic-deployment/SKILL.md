@@ -226,6 +226,80 @@ jobs:
 - Deploy to `staging` from `dev` branch
 - Tests before deploy (optional)
 
+### Deployable Commits
+
+Following Epic Web principles:
+
+**Deployable commits** - Every commit to the main branch should be deployable. This means:
+- The code should be in a working state
+- Tests should pass
+- The application should build successfully
+- No "WIP" or "TODO" commits that break the build
+
+**Example - Deployable commit workflow:**
+```bash
+# ✅ Good - Each commit is deployable
+git commit -m "Add user profile page"
+# This commit is complete, tested, and deployable
+
+git commit -m "Fix login redirect bug"
+# This commit fixes a bug and is deployable
+
+# ❌ Avoid - Non-deployable commits
+git commit -m "WIP: working on feature"
+# This commit might not work, not deployable
+
+git commit -m "Add feature (tests failing)"
+# This commit breaks the build, not deployable
+```
+
+**Benefits:**
+- Easy rollback - any commit can be deployed
+- Continuous deployment - deploy any time
+- Clear history - each commit represents a working state
+- Faster recovery - can deploy any previous commit
+
+### Small and Short Lived Merge Requests
+
+Following Epic Web principles:
+
+**Small and short lived merge requests** - Keep PRs small and merge them quickly. Large PRs are hard to review, risky to merge, and slow down the team.
+
+**Guidelines:**
+- **Small PRs** - Focus on one feature or fix per PR
+- **Short-lived** - Merge within a day or two, not weeks
+- **Reviewable** - PRs should be reviewable in 30 minutes or less
+- **Independent** - Each PR should be independently deployable
+
+**Example - Small, focused PR:**
+```bash
+# ✅ Good - Small, focused PR
+# PR: "Add email validation to signup form"
+# - Only changes signup validation
+# - Includes tests
+# - Can be reviewed quickly
+# - Can be merged and deployed independently
+
+# ❌ Avoid - Large, complex PR
+# PR: "Refactor authentication system and add 2FA and OAuth"
+# - Too many changes at once
+# - Hard to review
+# - Risky to merge
+# - Takes days to review
+```
+
+**Benefits:**
+- Faster reviews - easier to understand and review
+- Lower risk - smaller changes are less risky
+- Faster feedback - get feedback sooner
+- Easier rollback - smaller changes are easier to revert
+- Better collaboration - team can work in parallel on different small PRs
+
+**When PRs get too large:**
+- Split into multiple smaller PRs
+- Use feature flags to merge incrementally
+- Break down into logical pieces
+
 ### Tigris Object Storage
 
 **Create storage:**
@@ -440,6 +514,8 @@ git push origin main
 
 ## Common mistakes to avoid
 
+- ❌ **Non-deployable commits**: Every commit to main should be deployable - no WIP or broken commits
+- ❌ **Large, long-lived PRs**: Keep PRs small and merge quickly - large PRs are hard to review and risky
 - ❌ **Inconsistent primary region**: Make sure `primary_region` in `fly.toml` matches the volume region
 - ❌ **Secrets not configured**: Configure all secrets before first deploy
 - ❌ **Volume not created**: Create the `data` volume before deploy
@@ -454,6 +530,7 @@ git push origin main
 ## References
 
 - [Epic Stack Deployment Docs](../epic-stack/docs/deployment.md)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - [Fly.io Documentation](https://fly.io/docs)
 - [LiteFS Documentation](https://fly.io/docs/litefs/)
 - [Fly.io CLI Reference](https://fly.io/docs/flyctl/)

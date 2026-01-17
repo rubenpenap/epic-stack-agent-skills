@@ -23,6 +23,51 @@ Use this skill when you need to:
 
 ## Patterns and conventions
 
+### Database Philosophy
+
+Following Epic Web principles:
+
+**Do as little as possible** - Only fetch the data you actually need. Use `select` to fetch specific fields instead of entire models. Avoid over-fetching data "just in case" - fetch what you need, when you need it.
+
+**Pragmatism over purity** - Optimize queries when there's a measurable benefit, but don't over-optimize prematurely. Simple, readable queries are often better than complex optimized ones. Add indexes when queries are slow, not before.
+
+**Example - Fetch only what you need:**
+```typescript
+// ✅ Good - Fetch only needed fields
+const user = await prisma.user.findUnique({
+	where: { id: userId },
+	select: {
+		id: true,
+		username: true,
+		name: true,
+		// Only fetch what you actually use
+	},
+})
+
+// ❌ Avoid - Fetching everything
+const user = await prisma.user.findUnique({
+	where: { id: userId },
+	// Fetches all fields including password hash, email, etc.
+})
+```
+
+**Example - Pragmatic optimization:**
+```typescript
+// ✅ Good - Simple query first, optimize if needed
+const notes = await prisma.note.findMany({
+	where: { ownerId: userId },
+	select: { id: true, title: true, updatedAt: true },
+	orderBy: { updatedAt: 'desc' },
+	take: 20,
+})
+
+// Only add indexes if this query is actually slow
+// Don't pre-optimize
+
+// ❌ Avoid - Over-optimizing before measuring
+// Adding complex indexes, joins, etc. before knowing if it's needed
+```
+
 ### Prisma Schema
 
 Epic Stack uses Prisma with SQLite as the database.
@@ -398,31 +443,34 @@ npx tsx prisma/seed.ts
 
 ### Query Optimization
 
-**Best practices:**
-- Use `select` to fetch only needed fields
-- Use selective `include`
-- Index fields used in `where` and `orderBy`
-- Use composite indexes for complex queries
-- Avoid `select: true` (fetches everything)
+**Guidelines (pragmatic approach):**
+- Use `select` to fetch only needed fields - do as little as possible
+- Use selective `include` - only include relations you actually use
+- Index fields used in `where` and `orderBy` - but only if queries are slow
+- Use composite indexes for complex queries - when you have a real performance problem
+- Avoid `select: true` (fetches everything) - be explicit about what you need
+- Measure first, optimize second - don't pre-optimize
 
-**Optimized example:**
+**Optimized example (do as little as possible):**
 ```typescript
-// ❌ Bad: Fetches everything
+// ❌ Avoid: Fetches everything unnecessarily
 const user = await prisma.user.findUnique({
 	where: { id: userId },
+	// Fetches password hash, email, all relations, etc.
 })
 
-// ✅ Good: Only needed fields
+// ✅ Good: Only needed fields - do as little as possible
 const user = await prisma.user.findUnique({
 	where: { id: userId },
 	select: {
 		id: true,
 		username: true,
 		name: true,
+		// Only what you actually use
 	},
 })
 
-// ✅ Better: With selective relations
+// ✅ Better: With selective relations (only if you need them)
 const user = await prisma.user.findUnique({
 	where: { id: userId },
 	select: {
@@ -433,7 +481,7 @@ const user = await prisma.user.findUnique({
 				id: true,
 				title: true,
 			},
-			take: 10,
+			take: 10, // Only fetch what you need
 		},
 	},
 })
@@ -684,9 +732,10 @@ async function seed() {
 
 ## Common mistakes to avoid
 
-- ❌ **Not using indexes**: Always index foreign keys and fields used in frequent queries
-- ❌ **Fetching unnecessary fields**: Use `select` instead of fetching entire model
-- ❌ **N+1 queries**: Use `include` to fetch relations in a single query
+- ❌ **Fetching unnecessary data**: Use `select` to fetch only what you need - do as little as possible
+- ❌ **Over-optimizing prematurely**: Measure first, then optimize. Don't add indexes "just in case"
+- ❌ **Not using indexes when needed**: Index foreign keys and fields used in frequent queries, but only if they're actually slow
+- ❌ **N+1 queries**: Use `include` to fetch relations in a single query when you need them
 - ❌ **Not using transactions for related operations**: Always use transactions when multiple operations must be atomic
 - ❌ **Writing from replicas**: Verify `ensurePrimary()` before writes in production
 - ❌ **Breaking migrations without strategy**: Use "widen then narrow" for zero-downtime
@@ -694,10 +743,12 @@ async function seed() {
 - ❌ **Forgetting `onDelete` in relations**: Explicitly decide what to do when parent is deleted
 - ❌ **Not using CUID2**: Epic Stack uses CUID2 by default, don't use UUID or others
 - ❌ **Not closing Prisma Client**: Prisma handles this automatically, but ensure in scripts
+- ❌ **Complex queries when simple ones work**: Prefer simple, readable queries over complex optimized ones unless there's a real problem
 
 ## References
 
 - [Epic Stack Database Docs](../epic-stack/docs/database.md)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - [Prisma Documentation](https://www.prisma.io/docs)
 - [LiteFS Documentation](https://fly.io/docs/litefs/)
 - [SQLite Documentation](https://www.sqlite.org/docs.html)

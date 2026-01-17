@@ -23,6 +23,75 @@ Use this skill when you need to:
 
 ## Patterns and conventions
 
+### Testing Philosophy
+
+Following Epic Web principles:
+
+**Tests should resemble users** - Write tests that mirror how real users interact with your application. Test user workflows, not implementation details. If a user would click a button, your test should click that button. If a user would see an error message, your test should check for that specific message.
+
+**Make assertions specific** - Be explicit about what you're testing. Instead of vague assertions, use specific, meaningful checks that clearly communicate the expected behavior. This makes tests easier to understand and debug when they fail.
+
+**Example - Tests that resemble users:**
+```typescript
+// ✅ Good - Tests user workflow
+test('User can sign up and create their first note', async ({ page, navigate }) => {
+	// User visits signup page
+	await navigate('/signup')
+	
+	// User fills out form like a real person would
+	await page.getByRole('textbox', { name: /email/i }).fill('newuser@example.com')
+	await page.getByRole('textbox', { name: /username/i }).fill('newuser')
+	await page.getByRole('textbox', { name: /^password$/i }).fill('securepassword123')
+	await page.getByRole('textbox', { name: /confirm/i }).fill('securepassword123')
+	
+	// User submits form
+	await page.getByRole('button', { name: /sign up/i }).click()
+	
+	// User is redirected to onboarding
+	await expect(page).toHaveURL(/\/onboarding/)
+	
+	// User creates their first note
+	await navigate('/notes/new')
+	await page.getByRole('textbox', { name: /title/i }).fill('My First Note')
+	await page.getByRole('textbox', { name: /content/i }).fill('This is my first note!')
+	await page.getByRole('button', { name: /create/i }).click()
+	
+	// User sees their note
+	await expect(page.getByRole('heading', { name: 'My First Note' })).toBeVisible()
+	await expect(page.getByText('This is my first note!')).toBeVisible()
+})
+
+// ❌ Avoid - Testing implementation details
+test('Signup form calls API endpoint', async ({ page }) => {
+	// This tests implementation, not user experience
+	const response = await page.request.post('/signup', { data: {...} })
+	expect(response.status()).toBe(200)
+})
+```
+
+**Example - Specific assertions:**
+```typescript
+// ✅ Good - Specific assertions
+test('Form shows specific validation errors', async ({ page, navigate }) => {
+	await navigate('/signup')
+	await page.getByRole('button', { name: /sign up/i }).click()
+	
+	// Specific error messages that users would see
+	await expect(page.getByText(/email is required/i)).toBeVisible()
+	await expect(page.getByText(/username must be at least 3 characters/i)).toBeVisible()
+	await expect(page.getByText(/password must be at least 6 characters/i)).toBeVisible()
+})
+
+// ❌ Avoid - Vague assertions
+test('Form shows errors', async ({ page, navigate }) => {
+	await navigate('/signup')
+	await page.getByRole('button', { name: /sign up/i }).click()
+	
+	// Too vague - what errors? where?
+	expect(page.locator('.error')).toBeVisible()
+})
+```
+
 ### Two Types of Tests
 
 Epic Stack uses two types of tests:
@@ -359,7 +428,7 @@ test('User can login with GitHub', async ({ page, navigate, prepareGitHubUser })
 
 ## Common examples
 
-### Example 1: Complete E2E test
+### Example 1: Complete E2E test (resembling user workflow)
 
 ```typescript
 // tests/e2e/notes.test.ts
@@ -368,10 +437,11 @@ import { prisma } from '#app/utils/db.server.ts'
 import { faker } from '@faker-js/faker'
 
 test('Users can create, edit, and delete notes', async ({ page, navigate, login }) => {
+	// User logs in (realistic workflow)
 	const user = await login()
 	await navigate('/users/:username/notes', { username: user.username })
 
-	// Create
+	// User creates a new note (clicking link, filling form, submitting)
 	await page.getByRole('link', { name: /new note/i }).click()
 	const newNote = {
 		title: faker.lorem.words(3),
@@ -381,12 +451,13 @@ test('Users can create, edit, and delete notes', async ({ page, navigate, login 
 	await page.getByRole('textbox', { name: /content/i }).fill(newNote.content)
 	await page.getByRole('button', { name: /submit/i }).click()
 
-	// Verify creation
+	// Specific assertions: user sees their note with correct title and content
 	await expect(page.getByRole('heading', { name: newNote.title })).toBeVisible()
+	await expect(page.getByText(newNote.content)).toBeVisible()
 	const noteUrl = page.url()
 	const noteId = noteUrl.split('/').pop()
 
-	// Edit
+	// User edits the note (clicking edit, updating fields, saving)
 	await page.getByRole('link', { name: /edit/i }).click()
 	const updatedNote = {
 		title: faker.lorem.words(3),
@@ -396,12 +467,16 @@ test('Users can create, edit, and delete notes', async ({ page, navigate, login 
 	await page.getByRole('textbox', { name: /content/i }).fill(updatedNote.content)
 	await page.getByRole('button', { name: /submit/i }).click()
 
-	// Verify edit
+	// Specific assertions: user sees updated content
 	await expect(page.getByRole('heading', { name: updatedNote.title })).toBeVisible()
+	await expect(page.getByText(updatedNote.content)).toBeVisible()
 
-	// Delete
+	// User deletes the note (clicking delete button)
 	await page.getByRole('button', { name: /delete/i }).click()
+	
+	// Specific assertion: user is redirected back to notes list
 	await expect(page).toHaveURL(`/users/${user.username}/notes`)
+	await expect(page.getByText(updatedNote.title)).not.toBeVisible()
 })
 ```
 
@@ -488,6 +563,8 @@ test('Only admin can access admin routes', async ({ page, navigate, login, inser
 
 ## Common mistakes to avoid
 
+- ❌ **Testing implementation details instead of user workflows**: Write tests that mirror how users actually use your app
+- ❌ **Vague assertions**: Use specific, meaningful assertions that clearly communicate expected behavior
 - ❌ **Not cleaning data after tests**: Epic Stack cleans automatically, but make sure not to depend on data between tests
 - ❌ **Assuming execution order**: Tests must be independent
 - ❌ **Not using fixtures**: Use `login`, `insertNewUser`, etc. instead of creating everything manually
@@ -496,10 +573,12 @@ test('Only admin can access admin routes', async ({ page, navigate, login, inser
 - ❌ **Not using type-safe navigation**: Use `navigate` helper instead of `page.goto()` directly
 - ❌ **Forgetting MSW in tests**: External services are automatically mocked when `MOCKS=true`
 - ❌ **Not testing error cases**: Test both happy path and errors
+- ❌ **Testing internal state instead of user-visible behavior**: Focus on what users see and do
 
 ## References
 
 - [Epic Stack Testing Docs](../epic-stack/docs/testing.md)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - [Vitest Documentation](https://vitest.dev/)
 - [Playwright Documentation](https://playwright.dev/)
 - [Testing Library](https://testing-library.com/)

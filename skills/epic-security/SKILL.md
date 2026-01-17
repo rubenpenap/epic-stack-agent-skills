@@ -23,6 +23,84 @@ Use this skill when you need to:
 
 ## Patterns and conventions
 
+### Security Philosophy
+
+Following Epic Web principles:
+
+**Design to fail fast and early** - Validate security constraints as early as possible. Check authentication, authorization, and input validation before processing requests. Fail immediately with clear error messages rather than allowing potentially malicious data to flow through the system.
+
+**Optimize for the debugging experience** - When security checks fail, provide clear, actionable error messages that help developers understand what went wrong. Log security events with enough context to debug issues without exposing sensitive information.
+
+**Example - Fail fast validation:**
+```typescript
+// ✅ Good - Validate security constraints early
+export async function action({ request }: Route.ActionArgs) {
+	// 1. Authenticate immediately - fail fast if not authenticated
+	const userId = await requireUserId(request)
+	
+	// 2. Validate input early - fail fast if invalid
+	const formData = await request.formData()
+	const submission = await parseWithZod(formData, {
+		schema: NoteSchema,
+	})
+	
+	if (submission.status !== 'success') {
+		return data({ result: submission.reply() }, { status: 400 })
+	}
+	
+	// 3. Check permissions early - fail fast if unauthorized
+	await requireUserWithPermission(request, 'create:note:own')
+	
+	// Only proceed if all security checks pass
+	const { title, content } = submission.value
+	// ... create note
+}
+
+// ❌ Avoid - Security checks scattered or delayed
+export async function action({ request }: Route.ActionArgs) {
+	const formData = await request.formData()
+	// ... process data first
+	
+	// Security check at the end - too late!
+	const userId = await getUserId(request)
+	if (!userId) {
+		// Already processed potentially malicious data
+		return json({ error: 'Unauthorized' }, { status: 401 })
+	}
+}
+```
+
+**Example - Debugging-friendly error messages:**
+```typescript
+// ✅ Good - Clear error messages for debugging
+export async function checkHoneypot(formData: FormData) {
+	try {
+		await honeypot.check(formData)
+	} catch (error) {
+		if (error instanceof SpamError) {
+			// Log with context for debugging
+			console.error('Honeypot triggered', {
+				timestamp: new Date().toISOString(),
+				userAgent: formData.get('user-agent'),
+				// Don't log sensitive data
+			})
+			throw new Response('Form not submitted properly', { status: 400 })
+		}
+		throw error
+	}
+}
+
+// ❌ Avoid - Generic or unhelpful errors
+export async function checkHoneypot(formData: FormData) {
+	try {
+		await honeypot.check(formData)
+	} catch (error) {
+		// No context, hard to debug
+		throw new Response('Error', { status: 400 })
+	}
+}
+```
+
 ### Content Security Policy (CSP)
 
 Epic Stack uses CSP to prevent XSS and other attacks.
@@ -53,15 +131,17 @@ import { HoneypotInputs } from 'remix-utils/honeypot/react'
 </Form>
 ```
 
-**En el action:**
+**En el action (fail fast):**
 ```typescript
 import { checkHoneypot } from '#app/utils/honeypot.server.ts'
 
 export async function action({ request }: Route.ActionArgs) {
 	const formData = await request.formData()
 	
+	// Check honeypot first - fail fast if spam detected
 	await checkHoneypot(formData) // Lanza error si es spam
 	
+	// Only proceed if honeypot check passes
 	// ... resto del código
 }
 ```
@@ -81,6 +161,10 @@ export async function checkHoneypot(formData: FormData) {
 		await honeypot.check(formData)
 	} catch (error) {
 		if (error instanceof SpamError) {
+			// Log for debugging (without sensitive data)
+			console.error('Honeypot triggered', {
+				timestamp: new Date().toISOString(),
+			})
 			throw new Response('Form not submitted properly', { status: 400 })
 		}
 		throw error
@@ -312,17 +396,20 @@ fly secrets set HONEYPOT_SECRET="your-secret"
 - `.env` is in `.gitignore`
 - Use `fly secrets` for production
 
-### Validación de Session Expiration
+### Validación de Session Expiration (Fail Fast)
 
-**Always verify expiration:**
+**Always verify expiration early:**
 ```typescript
 export async function getUserId(request: Request) {
 	const authSession = await authSessionStorage.getSession(
 		request.headers.get('cookie'),
 	)
 	const sessionId = authSession.get(sessionKey)
+	
+	// Fail fast - return null immediately if no session
 	if (!sessionId) return null
 	
+	// Verify expiration early - fail fast if expired
 	const session = await prisma.session.findUnique({
 		select: { userId: true },
 		where: {
@@ -331,6 +418,7 @@ export async function getUserId(request: Request) {
 		},
 	})
 	
+	// Fail fast - destroy invalid session immediately
 	if (!session?.userId) {
 		throw redirect('/', {
 			headers: {
@@ -438,8 +526,10 @@ export async function action({ request }: Route.ActionArgs) {
 
 ## Common mistakes to avoid
 
+- ❌ **Delayed security checks**: Validate authentication, authorization, and input as early as possible - fail fast
+- ❌ **Generic error messages**: Provide clear, actionable error messages that help with debugging (without exposing sensitive data)
 - ❌ **Forgetting honeypot in public forms**: Always include `HoneypotInputs` in forms accessible without authentication
-- ❌ **Not validating session expiration**: Always verify `expirationDate` when getting sessions
+- ❌ **Not validating session expiration**: Always verify `expirationDate` when getting sessions - check early
 - ❌ **Using `dangerouslySetInnerHTML` with user data**: Never render user HTML without sanitizing
 - ❌ **Not using rate limiting**: Protect sensitive routes with rate limiting
 - ❌ **Secrets in code**: Never hardcode secrets, use environment variables
@@ -448,10 +538,12 @@ export async function action({ request }: Route.ActionArgs) {
 - ❌ **Sessions without httpOnly**: Always use `httpOnly: true` in session cookies
 - ❌ **Not using HTTPS in production**: Make sure to redirect HTTP to HTTPS
 - ❌ **CSP too permissive**: Review and adjust CSP according to your needs
+- ❌ **Not logging security events**: Log security failures with context for debugging (without sensitive data)
 
 ## References
 
 - [Epic Stack Security Docs](../epic-stack/docs/security.md)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [Content Security Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
 - `app/utils/honeypot.server.ts` - Honeypot implementation

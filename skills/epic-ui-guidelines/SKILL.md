@@ -24,6 +24,46 @@ Use this skill when you need to:
 
 ## Patterns and conventions
 
+### UI Philosophy
+
+Following Epic Web principles:
+
+**Software is built for people, by people** - Accessibility isn't about checking boxes or meeting standards. It's about creating software that works for real people with diverse needs, abilities, and contexts. Every UI decision should prioritize the human experience over technical convenience.
+
+Accessibility is not optional - it's how we ensure our software serves all users, not just some. When you make UI accessible, you're making it better for everyone: clearer labels help all users, keyboard navigation helps power users, and semantic HTML helps search engines.
+
+**Example - Human-centered approach:**
+```typescript
+// ✅ Good - Built for people
+function NoteForm() {
+	return (
+		<Form method="POST">
+			<Field
+				labelProps={{
+					htmlFor: fields.title.id,
+					children: 'Note Title', // Clear, human-readable label
+				}}
+				inputProps={{
+					...getInputProps(fields.title),
+					placeholder: 'Enter a descriptive title', // Helpful guidance
+					autoFocus: true, // Saves time for users
+				}}
+				errors={fields.title.errors} // Clear error messages
+			/>
+		</Form>
+	)
+}
+
+// ❌ Avoid - Technical convenience over user experience
+function NoteForm() {
+	return (
+		<Form method="POST">
+			<input name="title" /> {/* No label, no guidance, no accessibility */}
+		</Form>
+	)
+}
+```
+
 ### Semantic HTML
 
 **✅ Good - Use semantic elements:**
@@ -598,25 +638,27 @@ function FormWithErrorFocus({ actionData }: Route.ComponentProps) {
 
 ## Common mistakes to avoid
 
-- ❌ **Missing form labels**: Always use `Field` component which includes labels
-- ❌ **Using divs for semantic elements**: Use `<article>`, `<header>`, `<nav>`, etc.
-- ❌ **Ignoring keyboard navigation**: Ensure all interactive elements are keyboard accessible
-- ❌ **Low color contrast**: Test color combinations for WCAG AA compliance
+- ❌ **Treating accessibility as a checklist**: Accessibility is about serving real people, not just meeting standards
+- ❌ **Missing form labels**: Always use `Field` component which includes labels - helps all users, not just screen reader users
+- ❌ **Using divs for semantic elements**: Use `<article>`, `<header>`, `<nav>`, etc. - helps all users understand content structure
+- ❌ **Ignoring keyboard navigation**: Ensure all interactive elements are keyboard accessible - helps power users and those who can't use a mouse
+- ❌ **Low color contrast**: Test color combinations for WCAG AA compliance - helps users with visual impairments and in bright sunlight
 - ❌ **Missing ARIA attributes**: Use Epic Stack components which handle this automatically
 - ❌ **Breaking focus management**: Let Radix components handle focus
-- ❌ **Not testing with screen readers**: Test with VoiceOver, NVDA, or JAWS
+- ❌ **Not testing with screen readers**: Test with VoiceOver, NVDA, or JAWS - understand how real users experience your UI
 - ❌ **Hiding content from screen readers**: Use `sr-only` instead of `display: none` for screen reader only content
-- ❌ **Ignoring mobile users**: Always test on mobile devices
+- ❌ **Ignoring mobile users**: Always test on mobile devices - many users only have mobile access
 - ❌ **Not using Tailwind's responsive utilities**: Use mobile-first responsive design
 - ❌ **Not using live regions**: Use `aria-live` for dynamic content announcements
-- ❌ **Small touch targets**: Ensure interactive elements are at least 44x44px
-- ❌ **Ignoring reduced motion**: Respect `prefers-reduced-motion` media query
-- ❌ **Poor focus indicators**: Ensure focus is always visible
+- ❌ **Small touch targets**: Ensure interactive elements are at least 44x44px - helps users with motor impairments and on mobile
+- ❌ **Ignoring reduced motion**: Respect `prefers-reduced-motion` media query - helps users with vestibular disorders
+- ❌ **Poor focus indicators**: Ensure focus is always visible - helps keyboard users navigate
 - ❌ **Missing skip links**: Add skip to main content links for keyboard users
 
 ## References
 
 - [Web Content Accessibility Guidelines (WCAG)](https://www.w3.org/WAI/WCAG21/quickref/)
+- [Epic Web Principles](https://www.epicweb.dev/principles)
 - [Radix UI Documentation](https://www.radix-ui.com/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/)
 - [Epic Stack Forms Documentation](../epic-forms/SKILL.md)
