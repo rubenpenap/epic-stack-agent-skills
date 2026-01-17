@@ -1,0 +1,38 @@
+{
+  "name": "epic-stack-agent-skills",
+  "version": "1.0.0",
+  "description": "Agent skills for working with Epic Stack - A collection of skills for AI agents working with Epic Stack",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "skills/**",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "epic-stack",
+    "agent-skills",
+    "ai",
+    "coding-assistant",
+    "react-router",
+    "remix",
+    "react",
+    "prisma",
+    "fly-io",
+    "tailwind",
+    "radix-ui"
+  ],
+  "author": "rubenpenap",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rubenpenap/epic-stack-agent-skills.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
