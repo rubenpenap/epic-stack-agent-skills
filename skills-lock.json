@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "skill-creator": {
+      "source": "rubenpenap/skills",
+      "sourceType": "github",
+      "computedHash": "40c8dac558e003ad38e2a03292b0ebe49242945d9a60c751863f5e8271a143cd"
+    },
+    "token-optimizer": {
+      "source": "rubenpenap/skills",
+      "sourceType": "github",
+      "computedHash": "806908571cf9093aee647716d906c00d3390c59505f1b0b59adb3240e22b2c5a"
+    }
+  }
+}
